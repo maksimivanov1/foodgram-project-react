@@ -62,7 +62,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
           script: |
-            cd infra/
+            cd /Users/maksim/Desktop/!/dev/foodgram-project-react/infra
             sudo docker-compose down -v --rmi all
             sudo docker container prune --force
             sudo docker image prune --force
