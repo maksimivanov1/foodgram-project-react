@@ -21,4 +21,3 @@ class Command(BaseCommand):
                 except IntegrityError:
                     continue
         print("finished")
-        
