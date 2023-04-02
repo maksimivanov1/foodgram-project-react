@@ -87,6 +87,22 @@ class AddAndDeleteSubscribe(
         self.request.user.follower.filter(author=instance).delete()
 
 
+class AddDeleteShoppingCart(
+        GetObjectMixin,
+        generics.RetrieveDestroyAPIView,
+        generics.ListCreateAPIView):
+    """Добавить и удалить рецепт в корзине."""
+
+    def create(self, request, *args, **kwargs):
+        instance = self.get_object()
+        request.user.shopping_cart.recipe.add(instance)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_destroy(self, instance):
+        self.request.user.shopping_cart.recipe.remove(instance)
+
+
 class AddDeleteFavoriteRecipe(
         GetObjectMixin,
         generics.RetrieveDestroyAPIView,
@@ -101,22 +117,6 @@ class AddDeleteFavoriteRecipe(
 
     def perform_destroy(self, instance):
         self.request.user.favorite_recipe.recipe.remove(instance)
-
-
-class AddDeleteShoppingCart(
-        GetObjectMixin,
-        generics.RetrieveDestroyAPIView,
-        generics.ListCreateAPIView):
-    """Добавление и удаление рецепта в корзине."""
-
-    def create(self, request, *args, **kwargs):
-        instance = self.get_object()
-        request.user.shopping_cart.recipe.add(instance)
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    def perform_destroy(self, instance):
-        self.request.user.shopping_cart.recipe.remove(instance)
 
 
 class AuthToken(ObtainAuthToken):
@@ -212,7 +212,7 @@ class RecipesViewSet(viewsets.ModelViewSet):
             values(
                 'ingredients__name',
                 'ingredients__measurement_unit'
-            ).annotate(amount=Sum('recipe__amount')).order_by())
+            ).annotate(total=Sum('recipe__amount')).order_by())
         page.setFillColor('black')
         page.setFont('Vera', 14)
         if shopping_cart:
@@ -222,7 +222,7 @@ class RecipesViewSet(viewsets.ModelViewSet):
                 page.drawString(
                     x_position, y_position - indent,
                     f'{index}. {recipe["ingredients__name"]} - '
-                    f'{recipe["amount"]} '
+                    f'{recipe["total"]} '
                     f'{recipe["ingredients__measurement_unit"]}.')
                 y_position -= 15
                 if y_position <= 50:

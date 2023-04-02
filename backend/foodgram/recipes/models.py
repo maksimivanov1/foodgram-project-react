@@ -3,6 +3,7 @@ from django.core import validators
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from colorfield.fields import ColorField
 
 User = get_user_model()
 
@@ -29,9 +30,9 @@ class Tag(models.Model):
         'Имя',
         max_length=60,
         unique=True)
-    color = models.CharField(
-        'Цвет',
-        max_length=7,
+    color = ColorField(
+        verbose_name='Цвет',
+        default='#49B64E',
         unique=True)
     slug = models.SlugField(
         'Ссылка',
