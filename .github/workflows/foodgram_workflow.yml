@@ -70,7 +70,6 @@ jobs:
             sudo docker system prune --force
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.PROJECT_NAME_FRONTEND }}
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.PROJECT_NAME_BACKEND }}
-            sudo rm .env
             touch .env
             echo ENGINE=${{ secrets.ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
