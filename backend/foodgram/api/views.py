@@ -20,6 +20,7 @@ from rest_framework.response import Response
 
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsAdminOrReadOnly
+from api.mixins import GetObjectMixin, PermissionAndPaginationMixin
 from .serializers import (CustomUserCreateSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeReadSerializer,
                           RecipeWriteSerializer, SubscribeRecipeSerializer,
@@ -30,26 +31,6 @@ from recipes.models import (FavoriteRecipe, Ingredient, Recipe, ShoppingCart,
 
 User = get_user_model()
 FILENAME = 'shoppingcart.pdf'
-
-
-class GetObjectMixin:
-    """Миксин для удаления/добавления рецептов избранных/корзины."""
-
-    serializer_class = SubscribeRecipeSerializer
-    permission_classes = (AllowAny,)
-
-    def get_object(self):
-        recipe_id = self.kwargs['recipe_id']
-        recipe = get_object_or_404(Recipe, id=recipe_id)
-        self.check_object_permissions(self.request, recipe)
-        return recipe
-
-
-class PermissionAndPaginationMixin:
-    """Миксин для списка тегов и ингридиентов."""
-
-    permission_classes = (IsAdminOrReadOnly,)
-    pagination_class = None
 
 
 class AddAndDeleteSubscribe(
@@ -87,21 +68,17 @@ class AddAndDeleteSubscribe(
         self.request.user.follower.filter(author=instance).delete()
 
 
-class AddDeleteShoppingCart(
-        GetObjectMixin,
-        generics.RetrieveDestroyAPIView,
-        generics.ListCreateAPIView):
+class AddDeleteShoppingCart(generics.RetrieveUpdateDestroyAPIView):
     """Добавить и удалить рецепт в корзине."""
 
-    def create(self, request, *args, **kwargs):
-        instance = self.get_object()
-        request.user.shopping_cart.recipe.add(instance)
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    serializer_class = SubscribeRecipeSerializer
+    queryset = Recipe.objects.all()
+
+    def perform_update(self, serializer):
+        serializer.save()
 
     def perform_destroy(self, instance):
         self.request.user.shopping_cart.recipe.remove(instance)
-
 
 class AddDeleteFavoriteRecipe(
         GetObjectMixin,
