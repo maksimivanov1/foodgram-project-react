@@ -79,6 +79,7 @@ class AddDeleteShoppingCart(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         self.request.user.shopping_cart.recipe.remove(instance)
 
+
 class AddDeleteFavoriteRecipe(
         GetObjectMixin,
         generics.RetrieveDestroyAPIView,
