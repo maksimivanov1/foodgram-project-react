@@ -19,7 +19,6 @@ from rest_framework.permissions import (SAFE_METHODS, AllowAny,
 from rest_framework.response import Response
 
 from api.filters import IngredientFilter, RecipeFilter
-from api.permissions import IsAdminOrReadOnly
 from api.mixins import GetObjectMixin, PermissionAndPaginationMixin
 from .serializers import (CustomUserCreateSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeReadSerializer,
