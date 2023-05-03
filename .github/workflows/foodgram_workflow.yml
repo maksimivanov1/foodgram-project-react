@@ -64,12 +64,6 @@ jobs:
           script: |
             cd infra/
             sudo docker-compose down -v --rmi all
-            sudo docker container prune --force
-            sudo docker image prune --force
-            sudo docker volume prune --force
-            sudo docker system prune --force
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.PROJECT_NAME_FRONTEND }}
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.PROJECT_NAME_BACKEND }}
             touch .env
             echo ENGINE=${{ secrets.ENGINE }} >> .env
             echo DB_NAME=${{ secrets.DB_NAME }} >> .env
@@ -79,7 +73,6 @@ jobs:
             echo DB_PORT=${{ secrets.DB_PORT }} >> .env
             echo DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} >> .env
             echo PROJECT_NAME=${{ secrets.PROJECT_NAME }} >> .env
-            sudo docker-compose up -d --build
             sudo docker-compose exec -T backend python manage.py migrate
   
   send_message:
