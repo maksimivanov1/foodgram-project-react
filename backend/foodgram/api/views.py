@@ -73,8 +73,9 @@ class AddDeleteShoppingCart(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = SubscribeRecipeSerializer
     queryset = Recipe.objects.all()
 
-    def perform_update(self, serializer):
-        serializer.save()
+    def perform_update(self, request, serializer):
+        serializer.save(user=request.user,
+                        recipe=get_object_or_404(Recipe, id=id))
 
     def perform_destroy(self, instance):
         self.request.user.shopping_cart.recipe.remove(instance)
