@@ -28,7 +28,7 @@ urlpatterns = [
           AddDeleteFavoriteRecipe.as_view(),
           name='favorite_recipe'),
      path('recipes/<int:recipe_id>/shopping_cart/', 
-          RecipesViewSet.as_view({'get':list}), 
+          RecipesViewSet.as_view({'get': 'list'}), 
           name='shopping_cart'),
      path('', include(router.urls)),
      path('', include('djoser.urls')),
