@@ -158,6 +158,15 @@ class RecipesViewSet(viewsets.ModelViewSet):
             obj.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[IsAuthenticated])
+    def shopping_cart(self, request, **kwargs):
+        return self._create_delete(
+            request,
+            serializer=ShoppingCartSerializer,
+            model=ShoppingCart
+        )
+
     def get_queryset(self):
         return Recipe.objects.annotate(
             is_favorited=Exists(
@@ -224,19 +233,6 @@ class RecipesViewSet(viewsets.ModelViewSet):
         page.save()
         buffer.seek(0)
         return FileResponse(buffer, as_attachment=True, filename=FILENAME)
-
-
-class AddDeleteShoppingCart(RecipesViewSet):
-    """Добавить/удалить рецепт в корзине."""
-
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated])
-    def shopping_cart(self, request, **kwargs):
-        return self._create_delete(
-            request,
-            serializer=ShoppingCartSerializer,
-            model=ShoppingCart
-        )
 
 
 class TagsViewSet(
