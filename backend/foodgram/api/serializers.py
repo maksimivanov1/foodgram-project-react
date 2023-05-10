@@ -338,6 +338,7 @@ class SubscribeSerializer(GetIsSubscribedMixin, serializers.ModelSerializer):
             author=validated_data['author']
         )
 
+
 class RecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для просмотра рецептов"""
     is_favorited = serializers.SerializerMethodField(read_only=True)
@@ -350,6 +351,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             'name', 'image', 'text', 'cooking_time'
         )
         read_only_fields = ('author',)
+
 
 class ShoppingCartSerializer(RecipeSerializer):
     """Сериализатор добавления рецепта в корзину"""
