@@ -228,11 +228,10 @@ class RecipesViewSet(viewsets.ModelViewSet):
 
 class AddDeleteShoppingCart(RecipesViewSet):
     """Добавить/удалить рецепт в корзине."""
-    
+
     @action(detail=True, methods=['post', 'delete'],
             permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, **kwargs):
-        """Метод для добавления рецепта в список покупок"""
         return self._create_delete(
             request,
             serializer=ShoppingCartSerializer,
