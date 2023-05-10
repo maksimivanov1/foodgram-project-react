@@ -24,7 +24,7 @@ from .serializers import (CustomUserCreateSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeReadSerializer,
                           RecipeWriteSerializer, SubscribeRecipeSerializer,
                           SubscribeSerializer, TagSerializer, TokenSerializer,
-                          UserPasswordSerializer)
+                          UserPasswordSerializer, ShoppingCartSerializer)
 from recipes.models import (FavoriteRecipe, Ingredient, Recipe, ShoppingCart,
                             Tag)
 
@@ -65,20 +65,6 @@ class AddAndDeleteSubscribe(
 
     def perform_destroy(self, instance):
         self.request.user.follower.filter(author=instance).delete()
-
-
-class AddDeleteShoppingCart(generics.RetrieveUpdateDestroyAPIView):
-    """Добавить и удалить рецепт в корзине."""
-
-    serializer_class = SubscribeRecipeSerializer
-    queryset = Recipe.objects.all()
-
-    def perform_update(self, request, serializer):
-        serializer.save(user=request.user,
-                        recipe=get_object_or_404(Recipe, id=id))
-
-    def perform_destroy(self, instance):
-        self.request.user.shopping_cart.recipe.remove(instance)
 
 
 class AddDeleteFavoriteRecipe(
@@ -151,6 +137,36 @@ class RecipesViewSet(viewsets.ModelViewSet):
         if self.request.method in SAFE_METHODS:
             return RecipeReadSerializer
         return RecipeWriteSerializer
+
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[IsAuthenticated])
+    def _create_delete(self, request, serializer, model):
+        """Вспомогательный метод для добавления/удаления рецепта
+        в избранное/в список покупок"""
+        user = get_object_or_404(User, username=request.user)
+        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
+        if request.method == 'POST':
+            serializer = serializer(
+                recipe, data=request.data, context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            model.objects.create(user=user, recipe=recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        if request.method == "DELETE":
+            obj = get_object_or_404(model, user=user, recipe=recipe)
+            obj.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[IsAuthenticated])
+    def shopping_cart(self, request, **kwargs):
+        """Метод для добавления рецепта в список покупок"""
+        return self._create_delete(
+            request,
+            serializer=ShoppingCartSerializer,
+            model=ShoppingCart
+        )
 
     def get_queryset(self):
         return Recipe.objects.annotate(

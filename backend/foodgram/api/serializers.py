@@ -4,8 +4,9 @@ from django.contrib.auth.hashers import make_password
 from django.shortcuts import get_object_or_404
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from drf_base64.fields import Base64ImageField
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.fields import SerializerMethodField
+from recipes.models import ShoppingCart
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient, Subscribe, Tag
 
@@ -336,3 +337,34 @@ class SubscribeSerializer(GetIsSubscribedMixin, serializers.ModelSerializer):
         return request.user.follower.create(
             author=validated_data['author']
         )
+
+class RecipeSerializer(serializers.ModelSerializer):
+    """Сериализатор для просмотра рецептов"""
+    is_favorited = serializers.SerializerMethodField(read_only=True)
+    is_in_shopping_cart = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Recipe
+        fields = (
+            'id', 'author', 'is_favorited', 'is_in_shopping_cart',
+            'name', 'image', 'text', 'cooking_time'
+        )
+        read_only_fields = ('author',)
+
+class ShoppingCartSerializer(RecipeSerializer):
+    """Сериализатор добавления рецепта в корзину"""
+    name = serializers.ReadOnlyField()
+    cooking_time = serializers.ReadOnlyField()
+
+    class Meta(RecipeSerializer.Meta):
+        fields = ("id", "name", "image", "cooking_time")
+
+    def validate(self, data):
+        recipe = self.instance
+        user = self.context.get('request').user
+        if ShoppingCart.objects.filter(recipe=recipe, user=user).exists():
+            raise serializers.ValidationError(
+                detail='Рецепт уже добавлен в корзину',
+                code=status.HTTP_400_BAD_REQUEST,
+            )
+        return data
