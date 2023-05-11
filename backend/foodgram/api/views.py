@@ -24,7 +24,7 @@ from .serializers import (CustomUserCreateSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeReadSerializer,
                           RecipeWriteSerializer, SubscribeSerializer, 
                           TagSerializer, TokenSerializer,
-                          UserPasswordSerializer, ShoppingCartSerializer)
+                          UserPasswordSerializer)
 from recipes.models import (FavoriteRecipe, Ingredient, Recipe, ShoppingCart,
                             Tag)
 
@@ -127,112 +127,100 @@ class UsersViewSet(UserViewSet):
         return self.get_paginated_response(serializer.data)
 
 
-class RecipesViewSet(viewsets.ModelViewSet):
-    """Рецепты."""
+class RecipesViewSet(viewsets.ModelViewSet): 
+    """Рецепты.""" 
+ 
+    filterset_class = RecipeFilter 
+    permission_classes = (IsAuthenticatedOrReadOnly,) 
+ 
+    def get_serializer_class(self): 
+        if self.request.method in SAFE_METHODS: 
+            return RecipeReadSerializer 
+        return RecipeWriteSerializer 
+ 
+    def get_queryset(self): 
+        return Recipe.objects.annotate( 
+            is_favorited=Exists( 
+                FavoriteRecipe.objects.filter( 
+                    user=self.request.user, recipe=OuterRef('id'))), 
+            is_in_shopping_cart=Exists( 
+                ShoppingCart.objects.filter( 
+                    user=self.request.user, 
+                    recipe=OuterRef('id'))) 
+        ).select_related('author').prefetch_related( 
+            'tags', 'ingredients', 'recipe', 
+            'shopping_cart', 'favorite_recipe' 
+        ) if self.request.user.is_authenticated else Recipe.objects.annotate( 
+            is_in_shopping_cart=Value(False), 
+            is_favorited=Value(False), 
+        ).select_related('author').prefetch_related( 
+            'tags', 'ingredients', 'recipe', 
+            'shopping_cart', 'favorite_recipe') 
+ 
+    def perform_create(self, serializer): 
+        serializer.save(author=self.request.user) 
+ 
+    @action( 
+        detail=False, 
+        methods=['get'], 
+        permission_classes=(IsAuthenticated,)) 
+    def download_shopping_cart(self, request): 
+        """Скачать список с ингредиентами.""" 
+ 
+        buffer = io.BytesIO() 
+        page = canvas.Canvas(buffer) 
+        pdfmetrics.registerFont(TTFont('Vera', 'Vera.ttf')) 
+        x_position, y_position = 50, 800 
+        shopping_cart = ( 
+            request.user.shopping_cart.recipe. 
+            values( 
+                'ingredients__name', 
+                'ingredients__measurement_unit' 
+            ).annotate(total=Sum('recipe__amount')).order_by()) 
+        page.setFillColor('black') 
+        page.setFont('Vera', 14) 
+        if shopping_cart: 
+            indent = 20 
+            page.drawString(x_position, y_position, 'Cписок покупок:') 
+            for index, recipe in enumerate(shopping_cart, start=1): 
+                page.drawString( 
+                    x_position, y_position - indent, 
+                    f'{index}. {recipe["ingredients__name"]} - ' 
+                    f'{recipe["total"]} ' 
+                    f'{recipe["ingredients__measurement_unit"]}.') 
+                y_position -= 15 
+                if y_position <= 50: 
+                    page.showPage() 
+                    y_position = 800 
+            page.save() 
+            buffer.seek(0) 
+            return FileResponse( 
+                buffer, as_attachment=True, filename=FILENAME) 
+        page.setFont('Vera', 24) 
+        page.drawString( 
+            x_position, 
+            y_position, 
+            'Cписок покупок пуст!') 
+        page.save() 
+        buffer.seek(0) 
+        return FileResponse(buffer, as_attachment=True, filename=FILENAME) 
 
-    filterset_class = RecipeFilter
-    permission_classes = (IsAuthenticatedOrReadOnly,)
 
-    def get_serializer_class(self):
-        if self.request.method in SAFE_METHODS:
-            return RecipeReadSerializer
-        return RecipeWriteSerializer
+class AddDeleteShoppingCart( 
+        GetObjectMixin, 
+        generics.RetrieveDestroyAPIView, 
+        generics.ListCreateAPIView): 
+    """Добавить и удалить рецепт в корзине.""" 
+ 
+    def create(self, request, *args, **kwargs): 
+        instance = self.get_object() 
+        request.user.shopping_cart.recipe.add(instance) 
+        serializer = self.get_serializer(instance) 
+        return Response(serializer.data, status=status.HTTP_201_CREATED) 
+ 
+    def perform_destroy(self, instance): 
+        self.request.user.shopping_cart.recipe.remove(instance) 
 
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated])
-    def _create_delete(self, request, serializer, model):
-        """Вспомогательный метод для добавления/удаления рецепта
-        в избранное/в список покупок"""
-        user = get_object_or_404(User, username=request.user)
-        recipe = get_object_or_404(Recipe, pk=self.kwargs.get('pk'))
-        if request.method == 'POST':
-            serializer = serializer(
-                recipe, data=request.data, context={'request': request}
-            )
-            serializer.is_valid(raise_exception=True)
-            model.objects.create(user=user, recipe=recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        if request.method == "DELETE":
-            obj = get_object_or_404(model, user=user, recipe=recipe)
-            obj.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated])
-    def shopping_cart(self, request, **kwargs):
-        return self._create_delete(
-            request,
-            serializer=ShoppingCartSerializer,
-            model=ShoppingCart
-        )
-
-    def get_queryset(self):
-        return Recipe.objects.annotate(
-            is_favorited=Exists(
-                FavoriteRecipe.objects.filter(
-                    user=self.request.user, recipe=OuterRef('id'))),
-            is_in_shopping_cart=Exists(
-                ShoppingCart.objects.filter(
-                    user=self.request.user,
-                    recipe=OuterRef('id')))
-        ).select_related('author').prefetch_related(
-            'tags', 'ingredients', 'recipe',
-            'shopping_cart', 'favorite_recipe'
-        ) if self.request.user.is_authenticated else Recipe.objects.annotate(
-            is_in_shopping_cart=Value(False),
-            is_favorited=Value(False),
-        ).select_related('author').prefetch_related(
-            'tags', 'ingredients', 'recipe',
-            'shopping_cart', 'favorite_recipe')
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-
-    @action(
-        detail=False,
-        methods=['get'],
-        permission_classes=(IsAuthenticated,))
-    def download_shopping_cart(self, request):
-        """Скачать список с ингредиентами."""
-
-        buffer = io.BytesIO()
-        page = canvas.Canvas(buffer)
-        pdfmetrics.registerFont(TTFont('Vera', 'Vera.ttf'))
-        x_position, y_position = 50, 800
-        shopping_cart = (
-            request.user.shopping_cart.recipe.
-            values(
-                'ingredients__name',
-                'ingredients__measurement_unit'
-            ).annotate(total=Sum('recipe__amount')).order_by())
-        page.setFillColor('black')
-        page.setFont('Vera', 14)
-        if shopping_cart:
-            indent = 20
-            page.drawString(x_position, y_position, 'Cписок покупок:')
-            for index, recipe in enumerate(shopping_cart, start=1):
-                page.drawString(
-                    x_position, y_position - indent,
-                    f'{index}. {recipe["ingredients__name"]} - '
-                    f'{recipe["total"]} '
-                    f'{recipe["ingredients__measurement_unit"]}.')
-                y_position -= 15
-                if y_position <= 50:
-                    page.showPage()
-                    y_position = 800
-            page.save()
-            buffer.seek(0)
-            return FileResponse(
-                buffer, as_attachment=True, filename=FILENAME)
-        page.setFont('Vera', 24)
-        page.drawString(
-            x_position,
-            y_position,
-            'Cписок покупок пуст!')
-        page.save()
-        buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=FILENAME)
 
 
 class TagsViewSet(
