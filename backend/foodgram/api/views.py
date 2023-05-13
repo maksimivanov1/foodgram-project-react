@@ -2,13 +2,10 @@ import io
 
 from django.contrib.auth import get_user_model
 from django.db.models.aggregates import Count, Sum
+from django.db.models import F
 from django.db.models.expressions import Exists, OuterRef, Value
-from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 from rest_framework import generics, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -17,6 +14,7 @@ from rest_framework.permissions import (SAFE_METHODS, AllowAny,
                                         IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
+from django.http.response import HttpResponse
 
 from api.filters import IngredientFilter, RecipeFilter
 from api.mixins import GetObjectMixin, PermissionAndPaginationMixin
@@ -26,7 +24,7 @@ from .serializers import (CustomUserCreateSerializer, CustomUserSerializer,
                           TagSerializer, TokenSerializer,
                           UserPasswordSerializer)
 from recipes.models import (FavoriteRecipe, Ingredient, Recipe, ShoppingCart,
-                            Tag)
+                            Tag, RecipeIngredient)
 
 User = get_user_model()
 FILENAME = 'shoppingcart.pdf'
@@ -160,50 +158,34 @@ class RecipesViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer): 
         serializer.save(author=self.request.user) 
  
-    @action( 
-        detail=False, 
-        methods=['get'], 
-        permission_classes=(IsAuthenticated,)) 
-    def download_shopping_cart(self, request): 
-        """Скачать список с ингредиентами.""" 
- 
-        buffer = io.BytesIO() 
-        page = canvas.Canvas(buffer) 
-        pdfmetrics.registerFont(TTFont('Vera', 'Vera.ttf')) 
-        x_position, y_position = 50, 800 
-        shopping_cart = ( 
-            request.user.shopping_cart.recipe. 
-            values( 
-                'ingredients__name', 
-                'ingredients__measurement_unit' 
-            ).annotate(total=Sum('recipe__amount')).order_by()) 
-        page.setFillColor('black') 
-        page.setFont('Vera', 14) 
-        if shopping_cart: 
-            indent = 20 
-            page.drawString(x_position, y_position, 'Cписок покупок:') 
-            for index, recipe in enumerate(shopping_cart, start=1): 
-                page.drawString( 
-                    x_position, y_position - indent, 
-                    f'{index}. {recipe["ingredients__name"]} - ' 
-                    f'{recipe["total"]} ' 
-                    f'{recipe["ingredients__measurement_unit"]}.') 
-                y_position -= 15 
-                if y_position <= 50: 
-                    page.showPage() 
-                    y_position = 800 
-            page.save() 
-            buffer.seek(0) 
-            return FileResponse( 
-                buffer, as_attachment=True, filename=FILENAME) 
-        page.setFont('Vera', 24) 
-        page.drawString( 
-            x_position, 
-            y_position, 
-            'Cписок покупок пуст!') 
-        page.save() 
-        buffer.seek(0) 
-        return FileResponse(buffer, as_attachment=True, filename=FILENAME) 
+    @action(
+        detail=False,
+        methods=('get', ),
+        permission_classes=(IsAuthenticated, )
+    )
+    def download_shopping_cart(self, request):
+        """Скачивание ингредиентов из списка покупок."""
+        ingredients = (
+            RecipeIngredient.objects
+            .filter(recipe__shopping_cart__user=request.user)
+            .values('ingredients__name', 'ingredients__measurement_unit')
+            .annotate(amount=Sum(F('amount')))
+            .order_by()
+        )
+        shop_list = []
+        for ingredient in ingredients:
+            name = ingredient['ingredients__name']
+            measurement_unit = ingredient['ingredients__measurement_unit']
+            amount = ingredient['amount']
+            shop_list.append(
+                f'\n{name} - {amount} {measurement_unit}')
+        result = 'shop_list.txt'
+        response = HttpResponse(
+            shop_list,
+            content_type='text/plain'
+        )
+        response['Content-Disposition'] = f'attachment; filename={result}'
+        return response 
 
 
 class AddDeleteShoppingCart( 
