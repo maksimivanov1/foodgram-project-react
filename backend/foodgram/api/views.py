@@ -165,15 +165,15 @@ class RecipesViewSet(viewsets.ModelViewSet):
         """Скачивание ингредиентов из списка покупок."""
         ingredients = (
             RecipeIngredient.objects
-            .filter(recipe__shopping_cart__user=request.user)
-            .values('ingredients__name', 'ingredients__measurement_unit')
+            .filter(shopping_cart__user=request.user)
+            .values('ingredient__name', 'ingredient__measurement_unit')
             .annotate(amount=Sum(F('amount')))
             .order_by()
         )
         shop_list = []
         for ingredient in ingredients:
-            name = ingredient['ingredients__name']
-            measurement_unit = ingredient['ingredients__measurement_unit']
+            name = ingredient['ingredient__name']
+            measurement_unit = ingredient['ingredient__measurement_unit']
             amount = ingredient['amount']
             shop_list.append(
                 f'\n{name} - {amount} {measurement_unit}')
