@@ -158,32 +158,28 @@ class RecipesViewSet(viewsets.ModelViewSet):
  
     @action(
         detail=False,
-        methods=('get', ),
-        permission_classes=(IsAuthenticated, )
+        permission_classes=[IsAuthenticated, ]
     )
     def download_shopping_cart(self, request):
-        """Скачивание ингредиентов из списка покупок."""
-        ingredients = (
-            RecipeIngredient.objects
-            .filter(shopping_cart__user=request.user)
-            .values('ingredient__name', 'ingredient__measurement_unit')
-            .annotate(amount=Sum(F('amount')))
-            .order_by()
+        user = request.user
+        ingredients = RecipeIngredient.objects.filter(
+            recipe__shopping_cart__user=user).values(
+            name=F('ingredient__name'),
+            measurement_unit=F('ingredient__measurement_unit')).annotate(
+            amount=Sum('amount')
         )
-        shop_list = []
+        data = []
         for ingredient in ingredients:
-            name = ingredient['ingredient__name']
-            measurement_unit = ingredient['ingredient__measurement_unit']
-            amount = ingredient['amount']
-            shop_list.append(
-                f'\n{name} - {amount} {measurement_unit}')
-        result = 'shop_list.txt'
-        response = HttpResponse(
-            shop_list,
-            content_type='text/plain'
-        )
-        response['Content-Disposition'] = f'attachment; filename={result}'
-        return response 
+            data.append(
+                f'{ingredient["name"]} - '
+                f'{ingredient["amount"]} '
+                f'{ingredient["measurement_unit"]}'
+            )
+        content = 'Список покупок:\n\n' + '\n'.join(data)
+        filename = 'Shopping_cart.txt'
+        request = HttpResponse(content, content_type='text/plain')
+        request['Content-Disposition'] = f'attachment; filename={filename}'
+        return request
 
 
 class AddDeleteShoppingCart( 
